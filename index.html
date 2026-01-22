@@ -1,41 +1,142 @@
-name: Transmision Constante
-on:
-  workflow_dispatch:
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canal C Del Zulia - Transmisión</title>
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <link href="https://unpkg.com/@videojs/themes@1.0.1/dist/fantasy/index.css" rel="stylesheet">
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+        .container { width: 100vw; height: 100vh; position: relative; }
+        .video-js { width: 100% !important; height: 100% !important; }
 
-jobs:
-  stream:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+        .vjs-loading-spinner { display: none !important; }
 
-      - name: Instalar FFmpeg
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+        /* --- LOGO CON ANIMACIONES --- */
+        #video-logo {
+            position: absolute;
+            top: 45px;
+            left: 110px;
+            width: 130px;
+            z-index: 1000;
+            opacity: 0; 
+            pointer-events: none;
+        }
 
-      - name: Descargar Archivos
-        run: |
-          curl -L -o vid1.mp4 "https://www.dropbox.com/scl/fi/v5p2c4jpbczpeyo90gjn5/programa1.mp4?rlkey=dgjjbx2er3hfdpc9m117wp0c2&st=l5cstbfh&dl=1"
-          curl -L -o vid2.mp4 "https://www.dropbox.com/scl/fi/48dngz7t9xtbn18h6v839/programa2.mp4?rlkey=lms05w9e81b5suv5idnsz2e90&st=f02aau3m&dl=1"
-          curl -L -o logo.png "https://www.dropbox.com/scl/fi/snh8onwq9gx6zlum089j6/logo.png?rlkey=o5f2vp3q0hyaa513ucmq3sd6w&st=d3zoo3t8&dl=1"
+        .logo-visible { opacity: 1 !important; transition: none !important; }
+        .logo-low-opacity { opacity: 0.8 !important; transition: opacity 2s ease-in-out !important; }
+        .logo-hidden { opacity: 0 !important; transition: opacity 1.5s ease-in-out !important; }
 
-      - name: Unir y Transmitir
-        run: |
-          # PASO 1: Unimos los videos primero y esperamos que termine
-          echo "Iniciando union de videos..."
-          ffmpeg -i vid1.mp4 -i vid2.mp4 -filter_complex \
-          "[0:v]scale=1280:720,fps=30,format=yuv420p[v0]; \
-           [0:a]aresample=44100[a0]; \
-           [1:v]scale=1280:720,fps=30,format=yuv420p[v1]; \
-           [1:a]aresample=44100[a1]; \
-           [v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]" \
-          -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 23 -c:a aac -y final.mp4
+        #hide-controls-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10001;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.4);
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
 
-          # PASO 2: Solo cuando 'final.mp4' este listo, empezamos la transmision
-          echo "Video listo. Iniciando stream infinito..."
-          ffmpeg -re -stream_loop -1 -i final.mp4 -i logo.png \
-          -filter_complex "[1:v]scale=180:-1[logo_sc];[0:v][logo_sc]overlay=120:40,drawtext=text='':fontcolor=white:fontsize=24:x=120:y=210:box=1:boxcolor=black@0.5:boxborderw=5" \
-          -c:v libx264 -preset ultrafast -tune zerolatency -b:v 2500k -maxrate 2500k -bufsize 5000k \
-          -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
-          -f flv "rtmp://vs20.live.opencaster.com/opencaster/cristianhilos_314b91b0?psk=cristianhilos_314b91b0&tk=b77f89cbf4f83af5295e37a562a3379de814c3a945e7402811a589c00d91f442"
+        .ocultar-controles .vjs-control-bar { display: none !important; }
+    </style>
+</head>
+<body class="ocultar-controles">
+
+    <div class="container">
+        <img id="video-logo" src="https://www.dropbox.com/scl/fi/snh8onwq9gx6zlum089j6/logo.png?rlkey=o5f2vp3q0hyaa513ucmq3sd6w&st=d3zoo3t8&dl=1" alt="Logo">
+        
+        <button id="hide-controls-btn" onclick="toggleControles()">▼</button>
+        <video id="my-video" class="video-js vjs-theme-fantasy" playsinline></video>
+    </div>
+
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <script>
+        const playlist = [
+            "https://archive.org/download/2024-11-26-08-57-07/202411221656.mp4",
+            "https://archive.org/download/2024-11-26-08-57-07/output_free%20%285%29.mp4",
+            "https://archive.org/download/2024-11-26-08-57-07/y2mate.com%20-%20FREE%20COVER%20DE%20GAITAS%20Y%20SUS%20AMIGOS%20VOL1_720pHF.mp4",
+            "https://archive.org/download/2024-11-26-08-57-07/FREE%20COVER%20DE%20GAITAS%20Y%20SUS%20AMIGOS%20VOL.2.mp4"
+        ];
+
+        const player = videojs('my-video', {
+            controls: true,
+            autoplay: 'any',
+            responsive: true,
+            muted: false, 
+            controlBar: {
+                children: ['playToggle', 'volumePanel', 'currentTimeDisplay', 'progressControl', 'durationDisplay', 'fullscreenToggle'],
+            }
+        });
+
+        let currentIdx = 0;
+        player.src({ src: playlist[currentIdx], type: 'video/mp4' });
+
+        const logo = document.getElementById('video-logo');
+
+        // Lógica de animaciones del logo
+        player.on('timeupdate', function() {
+            let currentTime = player.currentTime();
+            let duration = player.duration();
+
+            if (currentTime >= 3 && currentTime < 5) {
+                logo.className = 'logo-visible';
+            } 
+            else if (currentTime >= 5 && currentTime < (duration - 1.5)) {
+                logo.className = 'logo-low-opacity';
+            }
+            else if (currentTime >= (duration - 1.5) && duration > 0) {
+                logo.className = 'logo-hidden';
+            }
+            else if (currentTime < 3) {
+                logo.className = '';
+                logo.style.opacity = "0";
+            }
+        });
+
+        player.on('loadstart', function() {
+            logo.className = '';
+            logo.style.opacity = "0";
+        });
+
+        // Loop de la playlist infinito
+        player.on('ended', function() {
+            currentIdx++;
+            if (currentIdx >= playlist.length) currentIdx = 0;
+            player.src({ src: playlist[currentIdx], type: 'video/mp4' });
+            player.play();
+        });
+
+        function toggleControles() {
+            document.getElementById('my-video').classList.toggle('ocultar-controles');
+        }
+
+        // --- FORZAR AUDIO Y REPRODUCCIÓN ---
+        player.ready(function() {
+            // Intentamos arrancar con sonido de inmediato
+            player.muted(false);
+            player.volume(1);
+
+            var promise = player.play();
+
+            if (promise !== undefined) {
+                promise.catch(error => {
+                    // Si el navegador bloquea el audio, arranca muteado para no detener el video
+                    console.log("Audio bloqueado por el navegador. Iniciando muteado...");
+                    player.muted(true);
+                    player.play();
+
+                    // TRUCO: Intentar activar el sonido automáticamente 1 segundo después
+                    setTimeout(() => {
+                        player.muted(false);
+                        player.volume(1);
+                        console.log("Intentando activar audio automáticamente...");
+                    }, 1500);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
